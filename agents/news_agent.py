@@ -235,22 +235,30 @@ INSTITUTIONAL_SOURCES: List[Dict[str, str]] = [
 # commodity-specific supply-chain terms.
 # -------------------------------------------------------------------
 
-DEFAULT_QUERY = (
+# NewsAPI enforces a 500-character limit on the q parameter.
+# The full keyword set exceeds this, so it is split across two queries
+# that are each fetched separately and merged in fetch_wire_news().
+
+# Query A: geopolitical / supply-chain disruption terms (~430 chars)
+DEFAULT_QUERY_A = (
     '(war OR invasion OR missile OR sanctions OR embargo OR '
     '"strait of hormuz" OR "red sea" OR "black sea" OR suez OR '
     'opec OR pipeline OR refinery OR "export ban" OR '
     '"grain corridor" OR ceasefire OR "peace talks" OR '
-    'coup OR blockade OR "drone attack" OR nuclear OR '
-    # US-specific macro and energy policy
-    '"federal reserve" OR "interest rates" OR "US inflation" OR '
+    'coup OR blockade OR "drone attack" OR nuclear)'
+)
+
+# Query B: US macro, energy policy, agriculture, and dollar terms (~430 chars)
+DEFAULT_QUERY_B = (
+    '("federal reserve" OR "interest rates" OR "US inflation" OR '
     '"SPR" OR "strategic petroleum reserve" OR '
     '"US energy" OR "US sanctions" OR "US tariffs" OR '
-    '"gulf of mexico" OR "permian basin" OR "shale" OR '
-    # US agriculture
-    '"USDA" OR "US crop" OR "US wheat" OR "US corn" OR "farm bill" OR '
-    # US dollar / macro impact on commodities
-    '"dollar index" OR "DXY" OR "US treasury" OR "fed funds")'
+    '"gulf of mexico" OR "permian basin" OR shale OR '
+    'USDA OR "US crop" OR "US wheat" OR "US corn" OR "farm bill" OR '
+    '"dollar index" OR DXY OR "US treasury" OR "fed funds")'
 )
+
+DEFAULT_QUERIES = [DEFAULT_QUERY_A, DEFAULT_QUERY_B]
 
 # -------------------------------------------------------------------
 # Allowed vocabularies for Nova classification output validation
@@ -417,42 +425,24 @@ def _risk_weight(article: ClassifiedArticle) -> float:
 # Tier 1: Fetch wire news via NewsAPI
 # -------------------------------------------------------------------
 
-def fetch_wire_news(
-    api_key: Optional[str] = None,
-    query: str = DEFAULT_QUERY,
-    days_back: int = 3,
-    page_size: int = 50,
-    language: str = "en",
+def _fetch_wire_news_single(
+    api_key: str,
+    query: str,
+    from_iso: str,
+    page_size: int,
+    language: str,
 ) -> List[RawArticle]:
     """
-    Fetch recent geopolitical and commodity headlines from NewsAPI,
-    filtered to trusted institutional wire sources.
-
-    Parameters
-    ----------
-    api_key   : NewsAPI key (falls back to NEWS_API_KEY env var)
-    query     : NewsAPI q parameter; defaults to GPR-aligned keyword set
-    days_back : lookback window in days
-    page_size : max articles to request (NewsAPI cap: 100)
-    language  : ISO 639-1 language code
-
-    Returns
-    -------
-    List[RawArticle] — deduplicated, trusted-source-only wire articles
+    Internal helper: run one NewsAPI request and return trusted RawArticles.
+    NewsAPI enforces a 500-character limit on the q parameter — callers are
+    responsible for ensuring each query fits within that limit.
     """
-    api_key = api_key or os.getenv("NEWS_API_KEY")
-    if not api_key:
-        raise ValueError("Missing NEWS_API_KEY environment variable.")
-
-    now = datetime.now(timezone.utc)
-    start = now - timedelta(days=days_back)
-
     params = {
         "q": query,
         "language": language,
         "sortBy": "publishedAt",
         "pageSize": min(page_size, 100),
-        "from": start.isoformat(),
+        "from": from_iso,
         "apiKey": api_key,
     }
 
@@ -490,7 +480,64 @@ def fetch_wire_news(
             published_at=_normalize_text(item.get("publishedAt")),
         ))
 
-    return _deduplicate_articles(results)
+    return results
+
+
+def fetch_wire_news(
+    api_key: Optional[str] = None,
+    queries: List[str] = None,
+    days_back: int = 3,
+    page_size: int = 50,
+    language: str = "en",
+) -> List[RawArticle]:
+    """
+    Fetch recent geopolitical and commodity headlines from NewsAPI,
+    filtered to trusted institutional wire sources.
+
+    NewsAPI enforces a 500-character limit on the ``q`` parameter. The full
+    keyword set exceeds this limit, so it is split across DEFAULT_QUERY_A and
+    DEFAULT_QUERY_B (see module constants). Both queries are run in parallel
+    and their results are merged and deduplicated before being returned.
+
+    Parameters
+    ----------
+    api_key   : NewsAPI key (falls back to NEWS_API_KEY env var)
+    queries   : list of NewsAPI q strings, each ≤ 500 chars;
+                defaults to DEFAULT_QUERIES (the two-part split)
+    days_back : lookback window in days
+    page_size : max articles to request per query (NewsAPI cap: 100)
+    language  : ISO 639-1 language code
+
+    Returns
+    -------
+    List[RawArticle] — deduplicated, trusted-source-only wire articles
+    """
+    api_key = api_key or os.getenv("NEWS_API_KEY")
+    if not api_key:
+        raise ValueError("Missing NEWS_API_KEY environment variable.")
+
+    if queries is None:
+        queries = DEFAULT_QUERIES
+
+    now = datetime.now(timezone.utc)
+    from_iso = (now - timedelta(days=days_back)).isoformat()
+
+    all_results: List[RawArticle] = []
+    with ThreadPoolExecutor(max_workers=len(queries)) as executor:
+        futures = {
+            executor.submit(
+                _fetch_wire_news_single,
+                api_key, q, from_iso, page_size, language
+            ): q
+            for q in queries
+        }
+        for future in as_completed(futures):
+            try:
+                all_results.extend(future.result())
+            except Exception as exc:
+                logger.warning("NewsAPI query failed: %s — %s", futures[future], exc)
+
+    return _deduplicate_articles(all_results)
 
 
 # -------------------------------------------------------------------
