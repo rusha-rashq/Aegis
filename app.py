@@ -1,4 +1,3 @@
-import json
 import math
 import time
 
@@ -304,23 +303,23 @@ with st.container():
 
     with p_col1:
         oil_exposure = st.number_input(
-            "🛢️ Oil ($M notional)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
+            "Oil ($M notional)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
         )
     with p_col2:
         gas_exposure = st.number_input(
-            "🔥 Natural Gas ($M)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
+            "Natural Gas ($M)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
         )
     with p_col3:
         wheat_exposure = st.number_input(
-            "🌾 Wheat ($M)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
+            "Wheat ($M)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
         )
     with p_col4:
         copper_exposure = st.number_input(
-            "🔩 Copper ($M)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
+            "Copper ($M)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
         )
     with p_col5:
         gold_exposure = st.number_input(
-            "🏅 Gold ($M)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
+            "Gold ($M)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
         )
 
     notes_col, _ = st.columns([3, 1])
@@ -604,7 +603,18 @@ if st.session_state.result is not None:
             "<div class='section-header'>GEOPOLITICAL SIGNALS</div>",
             unsafe_allow_html=True,
         )
-        headlines = summary.get("top_headlines", geo.get("articles", []))[:6]
+        raw_headlines = summary.get("top_headlines", geo.get("articles", []))
+
+        seen_titles = set()
+        headlines = []
+
+        for h in raw_headlines:
+            title = h.get("title", "").strip().lower()
+            if title and title not in seen_titles:
+                headlines.append(h)
+                seen_titles.add(title)
+
+        headlines = headlines[:6]
         for article in headlines:
             title = article.get("title", "")
             source = article.get("source", article.get("source_name", ""))
@@ -614,7 +624,9 @@ if st.session_state.result is not None:
             st.markdown(
                 f"""
             <div class='headline-item'>
-                <span style='color:#e2eaf8'>{title}</span><br>
+                <a href="{article.get('url', '#')}" target="_blank" style="color:#e2eaf8;text-decoration:none">
+                    {title}
+                </a>
                 <span style='font-family:Space Mono,monospace;font-size:9px;color:#00d4ff'>
                     {source}{f' · {bucket}' if bucket else ''}
                 </span>
