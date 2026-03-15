@@ -303,23 +303,23 @@ with st.container():
 
     with p_col1:
         oil_exposure = st.number_input(
-            "Oil ($M notional)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
+            "Oil ($M notional)", min_value=0.0, value=0.0, step=0.1, format="%.1f"
         )
     with p_col2:
         gas_exposure = st.number_input(
-            "Natural Gas ($M)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
+            "Natural Gas ($M)", min_value=0.0, value=0.0, step=0.1, format="%.1f"
         )
     with p_col3:
         wheat_exposure = st.number_input(
-            "Wheat ($M)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
+            "Wheat ($M)", min_value=0.0, value=0.0, step=0.1, format="%.1f"
         )
     with p_col4:
         copper_exposure = st.number_input(
-            "Copper ($M)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
+            "Copper ($M)", min_value=0.0, value=0.0, step=0.1, format="%.1f"
         )
     with p_col5:
         gold_exposure = st.number_input(
-            "Gold ($M)", min_value=0.0, value=0.0, step=1.0, format="%.1f"
+            "Gold ($M)", min_value=0.0, value=0.0, step=0.1, format="%.1f"
         )
 
     notes_col, _ = st.columns([3, 1])
@@ -349,14 +349,14 @@ portfolio = {
 if total_notional > 0:
     active_exposures = {k: v for k, v in portfolio["exposures"].items() if v > 0}
     tags_html = "".join(
-        f"<span class='exposure-tag'>{k}: ${v:.0f}M</span>"
+        f"<span class='exposure-tag'>{k}: ${v:.1f}M</span>"
         for k, v in active_exposures.items()
     )
     st.markdown(
         f"""
     <div class='portfolio-summary-card'>
         <div style='font-family:Space Mono,monospace;font-size:9px;color:#00d4ff;letter-spacing:0.15em;margin-bottom:8px'>
-            PORTFOLIO LOADED · TOTAL NOTIONAL ${total_notional:.0f}M
+            PORTFOLIO LOADED · TOTAL NOTIONAL ${total_notional:.1f}M
         </div>
         <div>{tags_html}</div>
         {f"<div style='font-size:11px;color:#6a7fa8;margin-top:8px;font-style:italic'>{portfolio_notes}</div>" if portfolio_notes else ""}

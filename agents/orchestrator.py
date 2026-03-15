@@ -2,7 +2,7 @@ import math
 import sys
 from typing import Dict, Any, Optional
 
-from agents import commodity_agent_new, news_agent, hedge_agent
+from agents import commodity_agent, news_agent, hedge_agent
 
 
 def _fix_stdout_encoding():
@@ -65,7 +65,7 @@ def run(portfolio: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     # Guard: validate commodity agent result before accessing ["analysis"]
     # ------------------------------------------------------------------
     print("🔍 Running Commodity Agent...")
-    commodity_result = commodity_agent_new.run()
+    commodity_result = commodity_agent.run()
 
     if commodity_result.get("status") == "error":
         raise RuntimeError(
