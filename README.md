@@ -1,77 +1,165 @@
 # ⚡ AEGIS — Agentic Global Intelligence System
 
-> A multi-agent AI system that monitors commodity markets and geopolitical events in real time, computes a **Global Stress Index**, and generates dynamic hedging strategies — powered by **Amazon Nova Pro** on AWS Bedrock.
+> A production-grade multi-agent AI system that monitors commodity markets and geopolitical events in real time, computes a **Global Stress Index (0–100)**, and generates dynamic, portfolio-aware hedging strategies — powered by **Amazon Nova Pro** on AWS Bedrock.
 
 ---
 
 ## 🧠 What is AEGIS?
 
-AEGIS is a multi-agent agentic AI system built for the **Agentic AI** category. Rather than using a single AI model, AEGIS coordinates four specialized agents that each focus on a distinct domain. The agents communicate through a central orchestrator, which synthesizes their findings into a unified risk assessment and clear, plain-English hedging recommendations.
+AEGIS coordinates three specialized AI agents through a central orchestrator. Each agent focuses on a distinct domain of global risk, producing structured outputs that the orchestrator synthesizes into a unified stress assessment and actionable portfolio recommendations.
 
-This architecture mirrors how real-world risk desks operate — specialists gather domain-specific signals, and a senior analyst synthesizes them into actionable strategy.
+This architecture mirrors how real-world risk desks operate — a commodity quant, a geopolitical analyst, and a portfolio risk manager each contribute domain-specific intelligence, and a senior strategist synthesizes it into strategy.
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    ORCHESTRATOR                          │
-│              (Coordinates all agents)                    │
-│         Computes Global Stress Index (0–100)             │
-└────────┬──────────────┬──────────────┬──────────────────┘
-         │              │              │
-    ┌────▼────┐   ┌─────▼─────┐  ┌───▼──────┐
-    │Commodity│   │    Geo    │  │  Hedge   │
-    │ Agent   │   │  Agent    │  │  Agent   │
-    │         │   │           │  │          │
-    │ yfinance│   │ NewsAPI   │  │Nova Pro  │
-    │ + Nova  │   │ + Nova    │  │          │
-    └─────────┘   └───────────┘  └──────────┘
+                    ┌──────────────────────────────────┐
+                    │           ORCHESTRATOR            │
+                    │   Computes Global Stress Index    │
+                    │   Sigmoid-normalizes geo score    │
+                    │   Builds full reasoning trace     │
+                    └────────┬──────────┬──────────────┘
+                             │          │
+              ┌──────────────▼──┐   ┌───▼──────────────────┐
+              │  Commodity Agent │   │     News Agent        │
+              │    (CMSI)        │   │  (News Intelligence)  │
+              │                  │   │                       │
+              │  4-component     │   │  Tier 1: NewsAPI      │
+              │  stress index    │   │  Tier 2: Institutional│
+              │  via yfinance    │   │  Nova classification  │
+              │  + Nova Pro      │   │  + risk scoring       │
+              └──────────────────┘   └───────────────────────┘
+                             │          │
+                    ┌────────▼──────────▼────────┐
+                    │        Hedge Agent          │
+                    │                             │
+                    │  Nova Pro → 3 portfolio-    │
+                    │  tailored strategies        │
+                    └─────────────────────────────┘
 ```
 
-### Agent Descriptions
+---
 
-**📦 Commodity Agent**
-Fetches 30-day price history for Oil, Gold, Wheat, Copper, and Natural Gas using `yfinance`. Computes deviation from 30-day moving averages and percentage changes. Sends this data to Amazon Nova Pro, which scores commodity market stress from 0–100 and identifies the top concern.
+## 🔬 Agent Deep-Dives
 
-**🌍 Geo Agent**
-Queries NewsAPI for the latest geopolitical headlines using targeted keywords (sanctions, war, conflict, supply disruption). Filters out noise and irrelevant articles, then sends the cleaned headlines to Amazon Nova Pro, which scores geopolitical risk from 0–100 and explains market implications.
+### 📦 Commodity Agent — CMSI (Commodity Market Stress Index)
 
-**⚡ Orchestrator**
-Receives scores from the Commodity and Geo agents. Computes the Global Stress Index as a weighted average: `GSI = 0.5 × commodity_score + 0.5 × geo_score`. Classifies the result as Low Risk / Elevated / High Risk / Critical.
+A four-component composite stress index inspired by BIS-style monitoring methodology:
 
-**🛡️ Hedge Agent**
-Receives the Global Stress Index and full analysis context from both agents. Sends everything to Amazon Nova Pro, which generates 3 prioritized, context-aware hedging strategies — each with a specific action, rationale, and urgency level.
+| Sub-Index | Weight | Description |
+|---|---|---|
+| **PDI** — Price Deviation Index | 40% | \|z-score\| of current price vs. 30-day rolling mean, capped at 3σ |
+| **VRI** — Volatility Regime Index | 30% | Ratio of 10-day realized vol to 60-day baseline + vol percentile rank |
+| **MSI** — Momentum Stress Index | 15% | Heuristic RSI-based overstretch score (overbought OR oversold) |
+| **CCI** — Correlation Contagion Index | 15% | Absolute increase in avg pairwise cross-commodity correlation (20d vs 60d baseline) |
+
+**Commodity universe with economic significance weights:**
+
+| Commodity | Ticker | Weight | Rationale |
+|---|---|---|---|
+| Oil | CL=F | 35% | Primary energy input; documented cross-commodity spillover |
+| Gold | GC=F | 20% | Safe-haven and inflation signal |
+| Natural Gas | NG=F | 20% | Energy market stress indicator |
+| Wheat | ZW=F | 15% | Food security and agricultural supply signal |
+| Copper | HG=F | 10% | Industrial demand bellwether |
+
+**Term structure** (contango/backwardation) is computed for narrative context using Working's (1949) storage theory but is **not included in the CMSI score**.
+
+**Academic references:**
+- Aldasoro, Hördahl & Zhu (BIS Quarterly Review, Sep 2022) — composite stress monitoring
+- Avalos & Huang (BIS Quarterly Review, Sep 2022) — commodity spillovers
+- Gorton & Rouwenhorst (Financial Analysts Journal, 2006) — commodity futures risk premiums
+- Billio, Getmansky, Lo & Pelizzon (JFE, 2012) — connectedness and systemic risk
+- Working (American Economic Review, 1949) — theory of the price of storage
+
+---
+
+### 🌍 News Agent — Geopolitical Intelligence
+
+A two-tier news intelligence system:
+
+**Tier 1 — Real-time wire services (NewsAPI)**
+Trusted sources: Reuters, Bloomberg, Associated Press, BBC News, Financial Times, Wall Street Journal, The Guardian, CNBC, S&P Global Commodity Insights, Argus Media, ICIS, EIA, USDA
+
+**Tier 2 — Institutional research (web-scraped public pages)**
+J.P. Morgan Global Research, Goldman Sachs Insights, BlackRock Investment Institute, UBS Chief Investment Office, Morgan Stanley Research, Vanguard Economic & Market Outlook
+
+> **Note:** Full institutional research (e.g. Goldman Sachs Commodity Views, JPM Global Commodities Strategy) requires Bloomberg Terminal or authenticated client portal access. AEGIS scrapes public insights pages only.
+
+**Nova Pro classifies each article into signal buckets:**
+
+| Bucket | Description |
+|---|---|
+| `war_conflict` | Armed conflict, military strikes, invasions |
+| `shipping_disruption` | Blockades, Red Sea, Hormuz, Suez, piracy |
+| `sanctions_trade` | Sanctions, trade wars, export bans, embargoes |
+| `opec_policy` | OPEC+ production decisions, quota changes |
+| `energy_infrastructure` | Pipeline, refinery, grid attacks or outages |
+| `export_restriction` | Unilateral export bans, grain corridor disruption |
+| `deescalation` | Ceasefire, peace talks, sanctions lifted |
+| `institutional_view` | Bank/asset manager market outlook or forecast |
+
+**Risk bias scoring** uses weighted relevance × confidence scoring (not raw article counts), so a single high-confidence invasion article correctly outweighs ten low-confidence OPEC policy notes.
+
+**Academic references:**
+- Caldara & Iacoviello (AER, 2022) — measuring geopolitical risk
+- Baker, Bloom & Davis (QJE, 2016) — economic policy uncertainty
+- Kilian (Annual Review of Resource Economics, 2014) — oil price shocks
+
+---
+
+### ⚡ Orchestrator — Global Stress Index
+
+Combines both agent outputs into a single GSI using sigmoid normalization:
+
+```
+# Geo score: sigmoid-normalizes unbounded raw score to [0, 100]
+# raw = 0  → 50 (neutral)
+# raw = 5  → 73 (elevated)
+# raw = 10 → 92 (high)
+g_score = round(100 / (1 + exp(-0.25 × raw_geo_score)))
+
+# Global Stress Index: equal-weight composite
+GSI = round(0.5 × CMSI_score + 0.5 × g_score)
+```
+
+The orchestrator also builds a full **reasoning trace** — a step-by-step log of every decision each agent made, exposed in the dashboard.
+
+---
+
+### 🛡️ Hedge Agent — Portfolio-Aware Strategies
+
+Receives the GSI, full CMSI analysis, and geopolitical signals from the news agent. If a user portfolio is provided (commodity exposures in $M notional), Nova generates strategies **tailored to that specific portfolio** — referencing dollar amounts and prioritizing the largest exposures.
+
+Without a portfolio, it generates generic market-level strategies.
+
+**Instruments Nova may recommend:** CME/NYMEX/CBOT futures, listed options, OTC swaps, basis swaps, cross-commodity spreads.
+
+---
+
+## 📊 Global Stress Index Reference
+
+| Score | Classification | Color | Posture |
+|---|---|---|---|
+| 0–29 | Low Risk | 🟢 Green | Minimal hedging needed |
+| 30–59 | Elevated | 🟡 Yellow | Monitor closely |
+| 60–79 | High Risk | 🟠 Orange | Active hedging recommended |
+| 80–100 | Critical | 🔴 Red | Maximum defensive posture |
 
 ---
 
 ## ✨ Features
 
-- **Real-time commodity monitoring** — Oil, Gold, Wheat, Copper, Natural Gas with 30-day deviation tracking
-- **Geopolitical news analysis** — Live headlines filtered for relevance, scored by Nova
-- **Global Stress Index** — A composite 0–100 score, color-coded by severity
-- **Dynamic hedging strategies** — 3 tailored recommendations that adapt to current stress levels
-- **Agent reasoning trace** — Judges and users can see exactly what each agent did and why
-- **Live pipeline animation** — Visual indicator showing each agent firing in sequence
-- **Plain-English explanations** — Nova explains the *why* behind every recommendation
-
----
-
-## 🖥️ Dashboard
-
-The Streamlit dashboard shows:
-
-| Section | Description |
-|---|---|
-| Global Stress Index | Large score with color coding (green → yellow → orange → red) |
-| Agent Cards | Individual scores from Commodity and Geo agents |
-| Live Commodity Prices | 5 commodities with price, % change, and 30d deviation |
-| Geopolitical Signals | Filtered live headlines with Nova's analysis |
-| Commodity Risk Analysis | Nova's explanation of market stress |
-| Nova Recommendation | Overall portfolio recommendation |
-| Dynamic Hedging Strategies | 3 strategies with urgency levels and rationale |
-| Agent Reasoning Trace | Expandable step-by-step view of each agent's thinking |
+- **CMSI** — 4-component commodity stress index (PDI + VRI + MSI + CCI) with academic grounding
+- **Dual-tier news intelligence** — wire services + institutional research, parallel scraping
+- **Per-article Nova classification** — 8 signal buckets, weighted risk bias scoring
+- **Sigmoid-normalized geo score** — properly commensurable with CMSI on [0, 100]
+- **Portfolio-aware hedging** — strategies reference your actual dollar exposures
+- **Agent reasoning trace** — full transparency into every agent decision
+- **Live pipeline animation** — visual step-by-step indicator as each agent fires
+- **Fallback handling** — rule-based explanations if Nova is unavailable
 
 ---
 
@@ -81,10 +169,12 @@ The Streamlit dashboard shows:
 |---|---|
 | AI Models | Amazon Nova Pro via AWS Bedrock |
 | Agent Orchestration | Custom Python multi-agent framework |
-| Market Data | yfinance |
-| News Data | NewsAPI |
+| Market Data | yfinance (Yahoo Finance futures) |
+| News — Tier 1 | NewsAPI |
+| News — Tier 2 | BeautifulSoup4 (institutional public pages) |
+| Parallel processing | ThreadPoolExecutor |
 | Frontend | Streamlit |
-| Cloud | AWS (Bedrock, IAM) |
+| Cloud | AWS Bedrock + IAM |
 
 ---
 
@@ -92,15 +182,15 @@ The Streamlit dashboard shows:
 
 ### Prerequisites
 
-- Python 3.14+
-- AWS account with Bedrock access (Amazon Nova Pro enabled)
+- Python 3.9+
+- AWS account with Bedrock access (Amazon Nova Pro enabled in `us-east-1`)
 - NewsAPI key — free at [newsapi.org](https://newsapi.org)
 
 ### Installation
 
 ```bash
-git clone https://github.com/yourusername/aegis.git
-cd aegis
+git clone https://github.com/rusha-rashq/Aegis.git
+cd Aegis
 python3 -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
@@ -117,81 +207,56 @@ AWS_DEFAULT_REGION=us-east-1
 NEWS_API_KEY=your_newsapi_key
 ```
 
-### Enable Amazon Nova on AWS
+### Enable Amazon Nova Pro on AWS
 
 1. Log into [AWS Console](https://console.aws.amazon.com)
-2. Navigate to **Bedrock → Foundation Models**
-3. Find **Amazon Nova Pro** and enable access
-4. Make sure your region is set to `us-east-1`
+2. Search **Bedrock** → **Foundation Models**
+3. Find **Amazon Nova Pro** → enable model access
+4. Confirm region is `us-east-1`
+5. Go to **IAM** → create a user with `AmazonBedrockFullAccess` → generate access keys
 
 ### Run
 
 ```bash
-# Test Nova connection
-python3 test_nova.py
-
 # Test the full agent pipeline
-python3 -c "from agents.orchestrator import run; import json; print(json.dumps(run(), indent=2))"
+python3 -c "from agents.orchestrator import run; import json; print(json.dumps(run(), indent=2, default=str))"
 
 # Launch the dashboard
 streamlit run app.py
 ```
+
+Open [http://localhost:8501](http://localhost:8501) and click **Run Analysis**.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-aegis/
+Aegis/
 ├── agents/
 │   ├── __init__.py          # Package init
-│   ├── orchestrator.py      # Coordinates agents, computes GSI, builds reasoning trace
-│   ├── commodity_agent.py   # Fetches market data, scores commodity stress via Nova
-│   ├── geo_agent.py         # Fetches news, filters noise, scores geopolitical risk via Nova
-│   └── hedge_agent.py       # Generates hedging strategies via Nova
+│   ├── orchestrator.py      # GSI computation, sigmoid normalization, reasoning trace
+│   ├── commodity_agent.py   # CMSI: PDI + VRI + MSI + CCI + Nova narrative
+│   ├── news_agent.py        # Dual-tier fetch, Nova classification, risk bias scoring
+│   └── hedge_agent.py       # Portfolio-aware strategy generation via Nova
 ├── app.py                   # Streamlit dashboard
 ├── requirements.txt         # Python dependencies
-├── .env                     # Secret credentials (never commit)
+├── .env                     # Secret credentials (never committed)
 ├── .gitignore
 └── README.md
 ```
 
 ---
 
-## 📊 Global Stress Index Scoring
-
-| Score | Level | Color | Description |
-|---|---|---|---|
-| 0–29 | Low Risk | 🟢 Green | Markets calm, minimal hedging needed |
-| 30–59 | Elevated | 🟡 Yellow | Moderate stress, monitor closely |
-| 60–79 | High Risk | 🟠 Orange | Significant stress, active hedging recommended |
-| 80–100 | Critical | 🔴 Red | Extreme stress, maximum defensive posture |
-
----
-
-## 🔍 Agent Reasoning Trace
-
-One of AEGIS's key features is full transparency into agent decision-making. After each analysis run, users can expand the **Agent Reasoning Trace** panel to see:
-
-- What data each agent received
-- What it sent to Amazon Nova Pro
-- What score Nova returned and why
-- How the orchestrator combined scores into the final GSI
-- What context the Hedge Agent used to generate strategies
-
-This makes AEGIS auditable and explainable — critical for real-world financial applications.
-
----
-
 ## 👥 Team
 
-Built at **Amazon Nova AI Hackathon** by:
+Built for the **Amazon Nova Hackathon** by:
 
-- **Rushali Dhar** — Purdue University, MS Software Engineering
-- **Anoushka Sinha** — University of Southern California, MS Computer Science
+- **[Rushali Dhar](https://github.com/rusha-rashq)** — Purdue University, MS Software Engineering
+- **[Anoushka Sinha](https://github.com/A-S-inha)** — University of Southern California, MS Computer Science
 
 ---
 
 ## 📄 License
 
-MIT License — feel free to use, modify, and distribute.
+MIT License — free to use, modify, and distribute.
