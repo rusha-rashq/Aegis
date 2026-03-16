@@ -6,9 +6,13 @@ import streamlit as st
 
 from agents.orchestrator import run
 
-if hasattr(st, "secrets"):
-    for key, val in st.secrets.items():
-        os.environ[key] = val
+try:
+    os.environ["AWS_ACCESS_KEY_ID"] = st.secrets["AWS_ACCESS_KEY_ID"]
+    os.environ["AWS_SECRET_ACCESS_KEY"] = st.secrets["AWS_SECRET_ACCESS_KEY"]
+    os.environ["AWS_DEFAULT_REGION"] = st.secrets["AWS_DEFAULT_REGION"]
+    os.environ["NEWS_API_KEY"] = st.secrets["NEWS_API_KEY"]
+except Exception:
+    pass
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
