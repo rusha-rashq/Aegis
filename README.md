@@ -12,7 +12,7 @@ This architecture mirrors how real-world risk desks operate — a commodity quan
 
 ---
 
-🚀 **Live Demo**: [your-app-url.streamlit.app](https://agenticglobalintelligencesystemaegis1.streamlit.app/)
+🚀 **Live Demo**: [agenticglobalintelligencesystemaegis1.streamlit.app](https://agenticglobalintelligencesystemaegis1.streamlit.app/)
 
 ## 🏗️ System Architecture
 
